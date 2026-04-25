@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <title>Innova Code | Bar Master Professional V2</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --primary: #1a2a6c; --accent: #ff4b2b; }
+        body { background-color: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+        .hero { background: linear-gradient(135deg, #1a2a6c, #2a5298); color: white; padding: 25px; border-radius: 0 0 20px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .nav-link { font-weight: 600; color: #555; cursor: pointer; }
+        .nav-link.active { color: var(--primary) !important; border-bottom: 3px solid var(--primary) !important; }
+        .step-label { font-size: 0.75rem; text-transform: uppercase; color: #888; font-weight: 800; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+<div class="hero text-center mb-4">
+    <h2 class="fw-bold">INNOVA CODE</h2>
+    <p>Step-by-Step Recipe & Inventory Management</p>
+</div>
+
+<div class="container">
+    <ul class="nav nav-tabs nav-justified mb-4" id="pills-tab">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#step1">1. Master Items</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#step2">2. Sales Menu</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#step3">3. Recipe Link</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#reports">Reports & Upload</button></li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="step1">
+            <div class="card p-4">
+                <span class="step-label">Step 01</span>
+                <h5 class="mb-3 text-primary">බෝතල්/අමුද්‍රව්‍ය ඇතුළත් කිරීම (Inventory Items)</h5>
+                <div class="row g-2">
+                    <div class="col-md-6"><input type="text" id="raw-name" class="form-control" placeholder="e.g. Rockland Vodka"></div>
+                    <div class="col-md-3"><input type="number" id="raw-ml" class="form-control" placeholder="ML Size (750)"></div>
+                    <div class="col-md-3"><button class="btn btn-dark w-100 fw-bold" onclick="addRawMaterial()">Add Bottle</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="step2">
+            <div class="card p-4">
+                <span class="step-label">Step 02</span>
+                <h5 class="mb-3 text-primary">විකුණුම් අයිතම (Menu Items)</h5>
+                <div class="row g-2">
+                    <div class="col-md-8"><input type="text" id="menu-name" class="form-control" placeholder="e.g. Vodka 25ml, Margarita"></div>
+                    <div class="col-md-4"><button class="btn btn-primary w-100 fw-bold" onclick="addMenuItem()">Add to Menu</button></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="step3">
+            <div class="card p-4">
+                <span class="step-label">Step 03</span>
+                <h5 class="mb-3 text-primary">Recipe Mapping (Ingredient List)</h5>
+                <div class="row g-2">
+                    <div class="col-md-4"><select id="select-menu" class="form-select"></select></div>
+                    <div class="col-md-4"><select id="select-raw" class="form-select"></select></div>
+                    <div class="col-md-2"><input type="number" id="link-qty" class="form-control" placeholder="ML"></div>
+                    <div class="col-md-2"><button class="btn btn-danger w-100 fw-bold" onclick="linkRecipe()">Link</button></div>
+                </div>
+            </div>
+            <div id="recipe-display" class="row"></div>
+        </div>
+
+        <div class="tab-pane fade" id="reports">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <h6>Upload Excel Data</h6>
+                        <input type="file" id="xl-file" class="form-control mb-3">
+                        <div class="btn-group w-100">
+                            <button class="btn btn-primary fw-bold" onclick="uploadData('GRN')">GRN (Bottles)</button>
+                            <button class="btn btn-danger fw-bold" onclick="uploadData('SALES')">Sales (Items)</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <h6>Live Stock Report</h6>
+                            <button class="btn btn-sm btn-outline-dark" onclick="refreshData()">🔄</button>
+                        </div>
+                        <div id="stock-table"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Configuration
+    const SB_URL = "https://rffxgmblnabitbhxlpni.supabase.co";
+    const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZnhnbWJsbmFiaXRiaHhscG5pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzIyODYsImV4cCI6MjA5MjcwODI4Nn0.-BE_Kk24MCZ60lY4NnekKAHvXFcIRvcsrm9nSncjjrg";
+    
+    // Client Init
+    const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+
+    // Step 1
+    async function addRawMaterial() {
+        const n = document.getElementById('raw-name').value.trim();
+        const m = document.getElementById('raw-ml').value;
+        if(!n || !m) return alert("Fill all fields");
+        await supabaseClient.from('inventory_items').insert({ item_name: n, ml_per_bottle: m });
+        alert("Saved!"); refreshData();
+    }
+
+    // Step 2
+    async function addMenuItem() {
+        const n = document.getElementById('menu-name').value.trim();
+        if(!n) return alert("Fill all fields");
+        await supabaseClient.from('sales_menu').insert({ menu_name: n });
+        alert("Saved!"); refreshData();
+    }
+
+    // Step 3
+    async function linkRecipe() {
+        const m = document.getElementById('select-menu').value;
+        const r = document.getElementById('select-raw').value;
+        const q = document.getElementById('link-qty').value;
+        if(!m || !r || !q) return alert("Fill all fields");
+        await supabaseClient.from('recipes').insert({ menu_name: m, raw_material_name: r, usage_qty_ml: q });
+        alert("Linked!"); refreshData();
+    }
+
+    // Upload
+    async function uploadData(type) {
+        const file = document.getElementById('xl-file').files[0];
+        if(!file) return alert("Select File");
+
+        const { data: rawList } = await supabaseClient.from('inventory_items').select('*');
+        const { data: recList } = await supabaseClient.from('recipes').select('*');
+        const bMap = new Map(rawList.map(b => [b.item_name, b]));
+        const rMap = recList.reduce((acc, r) => {(acc[r.menu_name] = acc[r.menu_name] || []).push(r); return acc;}, {});
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type: 'array'});
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1});
+            
+            let logs = [];
+            rows.forEach((row, idx) => {
+                if(idx < 2) return;
+                let name = (type === 'GRN' ? row[3] : row[1])?.toString().trim();
+                let qty = parseFloat(type === 'GRN' ? row[5] : row[2]);
+
+                if(name && !isNaN(qty)) {
+                    if(type === 'GRN') {
+                        let b = bMap.get(name);
+                        if(b) logs.push({ item_name: b.item_name, qty_ml: qty * b.ml_per_bottle, type: 'GRN' });
+                    } else {
+                        let ings = rMap[name];
+                        if(ings) ings.forEach(i => logs.push({ item_name: i.raw_material_name, qty_ml: qty * i.usage_qty_ml, type: 'SALES' }));
+                    }
+                }
+            });
+            const { error } = await supabaseClient.from('transactions').insert(logs);
+            if(error) alert(error.message); else { alert("Upload Done!"); refreshData(); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    async function refreshData() {
+        const { data: raw } = await supabaseClient.from('inventory_items').select('*').order('item_name');
+        const { data: menu } = await supabaseClient.from('sales_menu').select('*').order('menu_name');
+        const { data: recs } = await supabaseClient.from('recipes').select('*');
+        const { data: trans } = await supabaseClient.from('transactions').select('*');
+
+        if(!raw || !menu) return;
+
+        // Dropdowns
+        document.getElementById('select-menu').innerHTML = menu.map(m => `<option value="${m.menu_name}">${m.menu_name}</option>`).join('');
+        document.getElementById('select-raw').innerHTML = raw.map(r => `<option value="${r.item_name}">${r.item_name}</option>`).join('');
+
+        // Stock Table
+        let sHtml = '<table class="table small"><thead><tr><th>Item</th><th>Balance</th></tr></thead><tbody>';
+        raw.forEach(r => {
+            let tin = trans.filter(t => t.item_name === r.item_name && t.type === 'GRN').reduce((s,t)=>s+t.qty_ml, 0);
+            let tout = trans.filter(t => t.item_name === r.item_name && t.type === 'SALES').reduce((s,t)=>s+t.qty_ml, 0);
+            let bal = tin - tout;
+            sHtml += `<tr><td>${r.item_name}</td><td><b>${Math.floor(bal/r.ml_per_bottle)} Btls & ${bal%r.ml_per_bottle}ml</b></td></tr>`;
+        });
+        document.getElementById('stock-table').innerHTML = sHtml + '</tbody></table>';
+
+        // Recipe Cards
+        let rHtml = '';
+        menu.forEach(m => {
+            let ings = recs.filter(r => r.menu_name === m.menu_name);
+            rHtml += `<div class="col-md-4"><div class="card p-3 shadow-sm border-0"><h6 class="text-dark mb-1">${m.menu_name}</h6><p class="small text-muted mb-0">${ings.map(i => `${i.raw_material_name} (${i.usage_qty_ml}ml)`).join('<br>')}</p></div></div>`;
+        });
+        document.getElementById('recipe-display').innerHTML = rHtml;
+    }
+
+    window.onload = refreshData;
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
